@@ -33,13 +33,33 @@ docker run --rm -it -v "$PWD":/src -w /src ghcr.io/02900/ps3-toolchain bash
 ```
 
 > The image only **compiles** homebrew (it runs on your PC and emits PowerPC binaries for
-> the PS3). It does not run PS3 programs — load the resulting `.self` with `ps3load`.
+> the PS3). It does not run PS3 programs — load the resulting `.self` onto the console with
+> `ps3load` (also bundled in the image, see below).
+
+### Send a build to the PS3
+
+The image also ships `ps3load`, so you can push a build to a console running a network
+loader (PS3LoadX, listening on port `4299`) without installing anything locally. The key
+flag is **`--network host`**: it lets the container reach your PS3 directly on the LAN.
+Without it Docker's NAT delivers the file but the loader **never launches it** (the app
+just sits there).
+
+```bash
+docker run --rm --network host \
+  -e PS3LOAD=tcp:192.168.X.X \
+  -v "$PWD":/src -w /src \
+  ghcr.io/02900/ps3-toolchain \
+  ps3load /src/<your-build>.self
+```
+
+Replace `192.168.X.X` with your PS3's IP. On Apple Silicon, add `--platform linux/amd64`.
 
 ### Platform notes
 
 - **macOS (Apple Silicon):** the image is `linux/amd64`; add `--platform linux/amd64` to
   `docker run`/`docker build` (runs under emulation).
 - **Windows:** use WSL2 and the commands above, or PowerShell with `-v ${PWD}:/src`.
+- **Linux:** if your user isn't in the `docker` group, prefix the commands with `sudo`.
 
 ---
 
