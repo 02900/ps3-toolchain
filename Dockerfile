@@ -60,7 +60,7 @@ WORKDIR /build
 # archives/ with the fallback copies that ship in the repo. Also work around an
 # upstream bug: scripts 008/009 source ../utils/util.sh but the file is utils.sh.
 ENV NO_SAVANNAH=1
-RUN git clone --depth 1 https://github.com/ps3dev/ps3toolchain.git && \
+RUN git clone --depth 1 https://github.com/02900/ps3toolchain.git && \
     mkdir -p ps3toolchain/archives && \
     cp ps3toolchain/config/config.guess ps3toolchain/config/config.sub ps3toolchain/archives/ && \
     cp ps3toolchain/utils/utils.sh ps3toolchain/utils/util.sh && \
@@ -69,15 +69,15 @@ RUN git clone --depth 1 https://github.com/ps3dev/ps3toolchain.git && \
     rm -rf /build/ps3toolchain
 
 # ps3libraries provides the patches the README applies to PolarSSL.
-RUN git clone --depth 1 https://github.com/bucanero/ps3libraries.git
+RUN git clone --depth 1 https://github.com/02900/ps3libraries.git
 
 # --- Tiny3D --------------------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/wargio/Tiny3D.git && \
+RUN git clone --depth 1 https://github.com/02900/Tiny3D.git && \
     make -C Tiny3D/lib install && \
     rm -rf Tiny3D
 
 # --- YA2D ----------------------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/bucanero/ya2d_ps3.git && \
+RUN git clone --depth 1 https://github.com/02900/ya2d_ps3.git && \
     make -C ya2d_ps3/libya2d install && \
     rm -rf ya2d_ps3
 
@@ -137,12 +137,12 @@ RUN wget "http://mikmod.raphnet.net/files/libmikmod-${MIKMOD_VER}.tar.gz" && \
     cd /build && rm -rf libmikmod-${MIKMOD_VER}*
 
 # --- Mini18n -------------------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/bucanero/mini18n.git && \
+RUN git clone --depth 1 https://github.com/02900/mini18n.git && \
     make -C mini18n install && \
     rm -rf mini18n
 
 # --- PSL1GHT header refresh + Python 3 ps3py fix (README steps 5 & 6) -----------------
-RUN git clone --depth 1 https://github.com/ps3dev/PSL1GHT.git /tmp/PSL1GHT && \
+RUN git clone --depth 1 https://github.com/02900/PSL1GHT.git /tmp/PSL1GHT && \
     cp /tmp/PSL1GHT/ppu/include/sysutil/sysutil.h $PS3DEV/ppu/include/sysutil/ && \
     ln -sf /usr/bin/python3 /usr/bin/python && \
     cp /tmp/PSL1GHT/tools/ps3py/sfo.py /tmp/PSL1GHT/tools/ps3py/pkg.py \
