@@ -19,9 +19,10 @@ ENV PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH
 
 WORKDIR /build
 
-# --- Tiny3D (also installs font3d) ---------------------------------------------------
+# --- Tiny3D (libtiny3d) + font3d (libfont3d) -----------------------------------------
 RUN git clone --depth 1 https://github.com/02900/Tiny3D.git && \
     make -C Tiny3D/lib install && \
+    make -C Tiny3D/libfont install && \
     rm -rf Tiny3D
 
 # --- YA2D ----------------------------------------------------------------------------

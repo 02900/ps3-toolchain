@@ -74,9 +74,13 @@ RUN git clone --depth 1 https://github.com/02900/ps3toolchain.git && \
 # ps3libraries provides the patches the README applies to PolarSSL.
 RUN git clone --depth 1 https://github.com/02900/ps3libraries.git
 
-# NOTE: Tiny3D / YA2D (the renderer stack) are NOT in the core — they live in the
-# tiny3d variant (Dockerfile.tiny3d, FROM this image). ps3libraries (cloned above) is
-# kept: it provides the PolarSSL/MikMod patches used below.
+# Keep the CORE render-agnostic. ps3toolchain's toolchain.sh (above) bundles a baseline
+# Tiny3D (libtiny3d + libfont3d + their headers) in the portlibs — strip it so a renderer
+# never drags Tiny3D. The tiny3d variant (Dockerfile.tiny3d, FROM this image) reinstalls
+# the full render stack (Tiny3D + font3d + YA2D). ps3libraries (cloned above) is kept: it
+# provides the PolarSSL/MikMod patches used below.
+RUN rm -f $PORTLIBS/lib/libtiny3d.a $PORTLIBS/lib/libfont3d.a \
+          $PORTLIBS/include/tiny3d.h $PORTLIBS/include/libfont.h
 
 # --- PolarSSL v1.3.9 -----------------------------------------------------------------
 RUN wget --no-check-certificate -O polarssl-${POLARSSL_VER}.gpl.tgz \
