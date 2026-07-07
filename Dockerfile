@@ -131,7 +131,7 @@ RUN wget "http://mikmod.raphnet.net/files/libmikmod-${MIKMOD_VER}.tar.gz" && \
     LDFLAGS="-L$PSL1GHT/ppu/lib -L$PORTLIBS/lib -lrt -llv2" \
     CC="powerpc64-ps3-elf-gcc" RANLIB="powerpc64-ps3-elf-ranlib" \
     ../configure --prefix="$PORTLIBS" --host="powerpc64-ps3-elf" \
-        --disable-esd --disable-dl --disable-shared && \
+        --disable-esd --disable-dl --disable-shared --disable-threads && \
     make -j"$(nproc)" && \
     cp libmikmod/.libs/libmikmod.a $PORTLIBS/lib/ && \
     cp include/mikmod.h $PORTLIBS/include/ && \
