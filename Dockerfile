@@ -1,12 +1,15 @@
-# PS3 homebrew cross-compiler toolchain image.
+# PS3 homebrew cross-compiler toolchain image — CORE.
 #
-# Builds ps3toolchain + the common PSL1GHT portlibs (Tiny3D, YA2D, PolarSSL, libcurl,
-# MikMod, Mini18n) by cloning/downloading them from upstream at build time. No
-# third-party source is committed to this repo.
+# The base image every PS3 homebrew build starts from: ps3toolchain (ppu-gcc + PSL1GHT)
+# plus the common, render-agnostic PSL1GHT portlibs (zlib/freetype/libpng, MikMod,
+# PolarSSL, libcurl, Mini18n). The RENDERER stacks are separate variants built FROM this
+# core (Dockerfile.tiny3d / Dockerfile.rsxgl / Dockerfile.raylib), so a renderer never
+# drags another's libs. All cloned/downloaded from upstream at build time; no third-party
+# source is committed here.
 #
 # Build (slow — compiles the cross toolchain from source):
 #   docker build -t ps3-toolchain .
-# Use it to compile PS3 homebrew (mount your project at /src):
+# Use it to compile render-agnostic PS3 homebrew (or as the base for a variant):
 #   docker run --rm -v "$PWD":/src -w /src ghcr.io/02900/ps3-toolchain make
 #
 # CI builds this and publishes ghcr.io/02900/ps3-toolchain; it only rebuilds when this
@@ -71,15 +74,9 @@ RUN git clone --depth 1 https://github.com/02900/ps3toolchain.git && \
 # ps3libraries provides the patches the README applies to PolarSSL.
 RUN git clone --depth 1 https://github.com/02900/ps3libraries.git
 
-# --- Tiny3D --------------------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/02900/Tiny3D.git && \
-    make -C Tiny3D/lib install && \
-    rm -rf Tiny3D
-
-# --- YA2D ----------------------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/02900/ya2d_ps3.git && \
-    make -C ya2d_ps3/libya2d install && \
-    rm -rf ya2d_ps3
+# NOTE: Tiny3D / YA2D (the renderer stack) are NOT in the core — they live in the
+# tiny3d variant (Dockerfile.tiny3d, FROM this image). ps3libraries (cloned above) is
+# kept: it provides the PolarSSL/MikMod patches used below.
 
 # --- PolarSSL v1.3.9 -----------------------------------------------------------------
 RUN wget --no-check-certificate -O polarssl-${POLARSSL_VER}.gpl.tgz \

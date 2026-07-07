@@ -1,20 +1,23 @@
-name: build (core)
+name: build-tiny3d
+
+# Builds the Tiny3D toolchain variant (Dockerfile.tiny3d) FROM the published core
+# image and publishes ghcr.io/<owner>/ps3-toolchain-tiny3d. Everything lives on main;
+# this runs when Dockerfile.tiny3d changes, or on manual dispatch (use dispatch to
+# rebuild after the core image changes). CI runners are native amd64 with plenty of
+# RAM, so the transient SIGSEGV/OOM seen under local x86 emulation don't occur here.
 
 on:
   push:
     branches: [main]
-    paths: [Dockerfile, .github/workflows/build.yml]
-  pull_request:
-    branches: [main]
-    paths: [Dockerfile]
+    paths: [Dockerfile.tiny3d, .github/workflows/build-tiny3d.yml]
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/ps3-toolchain
+  IMAGE: ghcr.io/${{ github.repository_owner }}/ps3-toolchain-tiny3d
 
 jobs:
   image:
-    name: Build & publish toolchain image
+    name: Build & publish Tiny3D variant image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,7 +27,7 @@ jobs:
 
       - id: meta
         name: Compute image tag
-        run: echo "tag=${{ hashFiles('Dockerfile') }}" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${{ hashFiles('Dockerfile.tiny3d') }}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -35,11 +38,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Build only on PRs (don't push); build + push on main / manual runs.
-      - name: Build & push toolchain image
+      - name: Build & push Tiny3D variant image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile
+          file: Dockerfile.tiny3d
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}

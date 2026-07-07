@@ -1,0 +1,55 @@
+# PS3 homebrew toolchain — raylib variant.
+#
+# Adds raylib (nbe1233/raylib-ps3, master: the PSL1GHT+RSXGL port) on top of the
+# RSXGL toolchain image. raylib's PS3 backend renders through RSXGL's OpenGL ES 2
+# path (EGL), so this builds FROM the rsxgl image (which already provides
+# libEGL/libGL + the GL3/EGL headers), not the base image.
+#
+# Build (after the rsxgl image is published):
+#   docker build -f Dockerfile.raylib -t ps3-toolchain-raylib .
+# Use it the same way as the other images:
+#   docker run --rm -v "$PWD":/src -w /src ghcr.io/02900/ps3-toolchain-raylib make
+#
+# An app links `-lraylib` over the RSXGL stack and must link with the C++ driver
+# (RSXGL's libGL underneath is C++). Audio is OFF by default (RAYLIB_MODULE_AUDIO
+# = FALSE in raylib-ps3); pad/EGL/frame-pacing are handled inside raylib.
+
+FROM ghcr.io/02900/ps3-toolchain-rsxgl:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PS3DEV=/usr/local/ps3dev
+ENV PSL1GHT=$PS3DEV
+ENV PORTLIBS=$PS3DEV/portlibs/ppu
+ENV PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates make && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- raylib (PSL1GHT/RSXGL port) -----------------------------------------------------
+# `make PLATFORM=PLATFORM_PSL1GHT` builds src/libraylib.a (GRAPHICS_API_OPENGL_ES2
+# over EGL/RSXGL). There is no PS3 `install` target, so copy the lib + public
+# headers into the portlibs by hand. The retry loop guards the transient SIGSEGV
+# that ppu-gcc hits under x86 emulation (native amd64 CI doesn't need it).
+#
+# rlgl render-batch tuning (config.h). Text-heavy frames on RSXGL need small text
+# draw calls (a big single-texture glDrawElements corrupts glyph vertices), so the
+# app flushes the batch periodically (rlDrawRenderBatchActive). Each flush cycles
+# the batch VBO, so with the default single buffer the RSX reuses it mid-frame
+# while still reading it -> sprites flicker. Give it many batch buffers
+# (RL_DEFAULT_BATCH_BUFFERS=48) so a frame's flushes each write a different VBO with
+# no in-flight reuse; keep a modest element limit (2048) so 48 buffers stay small
+# in RSX memory.
+WORKDIR /build
+RUN git clone --depth 1 https://github.com/nbe1233/raylib-ps3.git && \
+    cd raylib-ps3/src && \
+    sed -i -E 's|^//#define (RL_DEFAULT_BATCH_BUFFER_ELEMENTS)[[:space:]]+[0-9]+|#define \1 2048|' config.h && \
+    sed -i -E 's|^#define (RL_DEFAULT_BATCH_BUFFERS)[[:space:]]+1\b|#define \1 48|' config.h && \
+    grep -E '^#define RL_DEFAULT_BATCH_BUFFER' config.h && \
+    ( ok=0; for i in 1 2 3 4 5 6 7 8; do make PLATFORM=PLATFORM_PSL1GHT -j"$(nproc)" && { ok=1; break; }; done; [ "$ok" = 1 ] ) && \
+    cp libraylib.a "$PORTLIBS/lib/" && \
+    cp raylib.h raymath.h rlgl.h "$PORTLIBS/include/" && \
+    test -f "$PORTLIBS/lib/libraylib.a" && test -f "$PORTLIBS/include/raylib.h" && \
+    cd /build && rm -rf raylib-ps3
+
+WORKDIR /src

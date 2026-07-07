@@ -1,0 +1,68 @@
+# PS3 homebrew toolchain — RSXGL variant.
+#
+# Adds RSXGL (gzorin/RSXGL: a partial OpenGL 3.1 core implementation for the PS3
+# RSX, with online GLSL compilation via a bundled Mesa) on top of the base
+# ghcr.io/02900/ps3-toolchain image, alongside the existing Tiny3D/YA2D portlibs.
+#
+# Build (after the base image is published):
+#   docker build -f Dockerfile.rsxgl -t ps3-toolchain-rsxgl .
+# Use it the same way as the base image:
+#   docker run --rm -v "$PWD":/src -w /src ghcr.io/02900/ps3-toolchain-rsxgl make
+#
+# Notes / hard-won facts (see the rsxgl-variant branch history):
+#   - RSXGL needs Python 2 with the libxml2 module (Mesa generates its GLES
+#     dispatch tables from XML at build time). Ubuntu 20.04 dropped the
+#     python-libxml2 package, so we build the binding from libxml2 source.
+#   - RSXGL's configure copies Mesa's Makefile-builtins into the bundled-Mesa
+#     build tree *with rsync*; without rsync the copy silently no-ops and the
+#     GLSL builtin_compiler step fails ("No rule to make target Makefile-builtins").
+#     So rsync MUST be installed before ./configure runs.
+#   - configure finds the PPU libpng/zlib already in the base image's portlibs.
+#   - Heavy compiles can hit transient SIGSEGV under x86 emulation (Apple Silicon);
+#     native amd64 CI runners don't. The make steps retry to be safe.
+
+FROM ghcr.io/02900/ps3-toolchain:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PS3DEV=/usr/local/ps3dev
+ENV PSL1GHT=$PS3DEV
+ENV PORTLIBS=$PS3DEV/portlibs/ppu
+ENV PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH
+ENV PYTHON=/usr/bin/python2
+
+# RSXGL build deps. rsync is REQUIRED before ./configure (see header). xutils-dev
+# provides makedepend; python2 + libxml2-dev let us build the libxml2 binding.
+ARG LIBXML2_VER=2.9.10
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        autoconf automake libtool pkg-config xutils-dev rsync \
+        flex bison build-essential \
+        python2 python2-dev libxml2 libxml2-dev \
+        git ca-certificates wget xz-utils patch && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- Python 2 libxml2 module (required by Mesa's build) ------------------------------
+# Ubuntu 20.04 has no python-libxml2 package; build the binding from matching source.
+WORKDIR /build
+RUN wget -q "https://download.gnome.org/sources/libxml2/${LIBXML2_VER%.*}/libxml2-${LIBXML2_VER}.tar.xz" && \
+    tar xf libxml2-${LIBXML2_VER}.tar.xz && \
+    cd libxml2-${LIBXML2_VER} && \
+    ./configure --with-python=/usr/bin/python2 --without-lzma && \
+    for i in 1 2 3 4 5; do make -j"$(nproc)" && break; done && \
+    for i in 1 2 3 4 5; do make -C python && make -C python install && break; done && \
+    ldconfig && \
+    python2 -c "import libxml2; print('python2 libxml2 module OK')" && \
+    cd /build && rm -rf libxml2-${LIBXML2_VER}*
+
+# --- RSXGL ---------------------------------------------------------------------------
+# Installs librsxgl + GL headers into $PS3DEV / $PORTLIBS. Samples are disabled
+# (they need a console + cgc); we only want the library and headers.
+RUN git clone --depth 1 https://github.com/gzorin/RSXGL.git && \
+    cd RSXGL && \
+    NOCONFIGURE=1 ./autogen.sh && \
+    ./configure --with-ppu-prefix="$PORTLIBS" --prefix="$PS3DEV" --disable-samples && \
+    ( ok=0; for i in 1 2 3 4 5 6 7 8; do make -j"$(nproc)" && { ok=1; break; }; done; [ "$ok" = 1 ] ) && \
+    make install && \
+    test -f "$PORTLIBS/lib/libGL.a" && \
+    cd /build && rm -rf RSXGL
+
+WORKDIR /src

@@ -1,0 +1,51 @@
+name: build-raylib
+
+# Builds the raylib toolchain variant (Dockerfile.raylib) FROM the published rsxgl
+# image and publishes ghcr.io/<owner>/ps3-toolchain-raylib. Everything lives on main;
+# this runs when Dockerfile.raylib changes, or on manual dispatch (use dispatch to
+# rebuild after the rsxgl/core images change). CI runners are native amd64, so the
+# transient SIGSEGV/OOM seen under local x86 emulation don't occur here.
+
+on:
+  push:
+    branches: [main]
+    paths: [Dockerfile.raylib, .github/workflows/build-raylib.yml]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/ps3-toolchain-raylib
+
+jobs:
+  image:
+    name: Build & publish raylib variant image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Compute image tag
+        run: echo "tag=${{ hashFiles('Dockerfile.raylib') }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build only on PRs (don't push); build + push on the branch / manual runs.
+      - name: Build & push raylib variant image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.raylib
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -4,16 +4,30 @@ A ready-to-use **PS3 homebrew cross-compiler toolchain** packaged as a Docker im
 you can build PS3 homebrew on **macOS, Windows, or Linux** without installing the toolchain
 on your machine.
 
-The image contains Ubuntu 20.04 plus:
+## Images: a core + one image per renderer
 
-- the [ps3toolchain](https://github.com/ps3dev/ps3toolchain) cross compiler
-  (`powerpc64-ps3-elf-gcc`) and the [PSL1GHT](https://github.com/ps3dev/PSL1GHT) SDK,
-- the common portlibs: **Tiny3D, YA2D, PolarSSL, libcurl, MikMod, Mini18n** (plus
-  freetype/zlib/jpgdec/pngdec from ps3libraries).
+The **core** image is the base every PS3 homebrew build starts from; the **renderer** stacks
+are separate variants built `FROM` it, so a renderer never drags another's libraries. Pick the
+image that matches how you draw:
 
-The [`Dockerfile`](Dockerfile) builds everything by **cloning/downloading from upstream at
-build time** — no third-party source is committed here. A private, fully-vendored
-(offline, upstream-independent) variant lives in `02900/ps3-toolchain-vendored`.
+| Image | = | Adds | Use it for |
+|---|---|---|---|
+| **`ps3-toolchain`** (core) | Ubuntu 20.04 + [ps3toolchain](https://github.com/ps3dev/ps3toolchain) (`powerpc64-ps3-elf-gcc`) + [PSL1GHT](https://github.com/ps3dev/PSL1GHT) + render-agnostic portlibs (zlib/freetype/libpng, MikMod, PolarSSL, libcurl, Mini18n) | — | render-agnostic code, or as the base for a variant |
+| **`ps3-toolchain-tiny3d`** | core + | Tiny3D, YA2D, font3d | Tiny3D / ya2d homebrew |
+| **`ps3-toolchain-rsxgl`** | core + | RSXGL (OpenGL 3.1 over the RSX) | raw OpenGL homebrew |
+| **`ps3-toolchain-raylib`** | rsxgl + | raylib | raylib homebrew |
+
+```
+ps3-toolchain (core)
+├─ ps3-toolchain-tiny3d   (Dockerfile.tiny3d)
+├─ ps3-toolchain-rsxgl    (Dockerfile.rsxgl)
+└─ ps3-toolchain-raylib   (Dockerfile.raylib, FROM rsxgl)
+```
+
+Each [`Dockerfile*`](.) builds by **cloning/downloading from upstream at build time** — no
+third-party source is committed here. A per-variant CI workflow publishes each image to GHCR
+(rebuilt only when its Dockerfile changes; `workflow_dispatch` re-triggers after a core change).
+A private, fully-vendored (offline) variant of the core lives in `02900/ps3-toolchain-vendored`.
 
 ---
 

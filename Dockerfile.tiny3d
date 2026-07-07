@@ -1,0 +1,32 @@
+# PS3 homebrew toolchain — Tiny3D variant.
+#
+# Adds the Tiny3D + YA2D 2D/3D rendering libraries (wargio/Tiny3D, bucanero/ya2d_ps3,
+# which also installs font3d) on top of the core ps3-toolchain image. Use this for
+# Tiny3D/ya2d homebrew — the core image no longer bundles the renderer stack (each
+# renderer is its own variant, so nothing drags another's libs).
+#
+# Build (after the core image is published):
+#   docker build -f Dockerfile.tiny3d -t ps3-toolchain-tiny3d .
+# Use it (mount your project at /src):
+#   docker run --rm -v "$PWD":/src -w /src ghcr.io/02900/ps3-toolchain-tiny3d make
+
+FROM ghcr.io/02900/ps3-toolchain:latest
+
+ENV PS3DEV=/usr/local/ps3dev
+ENV PSL1GHT=$PS3DEV
+ENV PORTLIBS=$PS3DEV/portlibs/ppu
+ENV PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH
+
+WORKDIR /build
+
+# --- Tiny3D (also installs font3d) ---------------------------------------------------
+RUN git clone --depth 1 https://github.com/02900/Tiny3D.git && \
+    make -C Tiny3D/lib install && \
+    rm -rf Tiny3D
+
+# --- YA2D ----------------------------------------------------------------------------
+RUN git clone --depth 1 https://github.com/02900/ya2d_ps3.git && \
+    make -C ya2d_ps3/libya2d install && \
+    rm -rf ya2d_ps3
+
+WORKDIR /src
